@@ -1,0 +1,201 @@
+# ==========================================
+# STUDENT PERFORMANCE PROGRESSION & RISK ANALYZER
+# MAJOR PROJECT CODE
+# ==========================================
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import classification_report, accuracy_score
+
+# ==========================================
+# 1. DATA CREATION (FOR DEMO PURPOSE)
+# ==========================================
+
+np.random.seed(42)
+
+students = ['S1', 'S2', 'S3', 'S4', 'S5']
+subjects = ['Maths', 'Physics', 'Chemistry', 'CS']
+semesters = [1, 2, 3, 4]
+
+data = []
+
+for student in students:
+    base_marks = np.random.randint(45, 75)
+    base_attendance = np.random.randint(55, 90)
+
+    for sem in semesters:
+        for subject in subjects:
+            marks = max(30, base_marks + np.random.randint(-10, 10) - sem)
+            attendance = max(40, base_attendance + np.random.randint(-8, 5) - sem)
+
+            data.append([
+                student,
+                sem,
+                subject,
+                marks,
+                attendance
+            ])
+
+df = pd.DataFrame(
+    data,
+    columns=['StudentID', 'Semester', 'Subject', 'Marks', 'Attendance']
+)
+
+print("\nDATA SAMPLE:")
+print(df.head())
+
+# ==========================================
+# 2. DATA PREPROCESSING
+# ==========================================
+
+df['Marks'] = df['Marks'].astype(float)
+df['Attendance'] = df['Attendance'].astype(float)
+
+# ==========================================
+# 3. PERFORMANCE TREND ANALYSIS
+# ==========================================
+
+trend_df = df.groupby(['StudentID', 'Semester'])['Marks'].mean().reset_index()
+
+plt.figure(figsize=(8,5))
+for student in trend_df['StudentID'].unique():
+    sdata = trend_df[trend_df['StudentID'] == student]
+    plt.plot(sdata['Semester'], sdata['Marks'], marker='o', label=student)
+
+plt.title("Semester-wise Performance Trend")
+plt.xlabel("Semester")
+plt.ylabel("Average Marks")
+plt.legend()
+plt.grid()
+plt.show()
+
+# ==========================================
+# 4. SUBJECT DIFFICULTY INDEX
+# ==========================================
+
+subject_avg = df.groupby('Subject')['Marks'].mean()
+difficulty_index = 100 - subject_avg
+
+plt.figure(figsize=(6,4))
+sns.heatmap(difficulty_index.to_frame(), annot=True, cmap='Reds')
+plt.title("Subject Difficulty Index Heatmap")
+plt.show()
+
+# ==========================================
+# 5. CONSISTENCY SCORE (STD DEVIATION)
+# ==========================================
+
+consistency_std = df.groupby('StudentID')['Marks'].std()
+consistency_score = 1 / (1 + consistency_std)
+
+print("\nCONSISTENCY SCORE:")
+print(consistency_score)
+
+# ==========================================
+# 6. RULE-BASED DROPOUT RISK ANALYSIS
+# ==========================================
+
+risk_df = df.groupby('StudentID').agg({
+    'Marks': 'mean',
+    'Attendance': 'mean'
+}).reset_index()
+
+risk_df['Rule_Based_Risk'] = np.where(
+    (risk_df['Marks'] < 50) | (risk_df['Attendance'] < 60),
+    'AT RISK',
+    'SAFE'
+)
+
+print("\nRULE BASED RISK REPORT:")
+print(risk_df)
+
+# ==========================================
+# 7. ATTENDANCE vs MARKS CORRELATION
+# ==========================================
+
+plt.figure(figsize=(6,4))
+sns.scatterplot(data=df, x='Attendance', y='Marks')
+plt.title("Attendance vs Marks")
+plt.grid()
+plt.show()
+
+correlation = df['Attendance'].corr(df['Marks'])
+print("\nATTENDANCE-MARKS CORRELATION:", correlation)
+
+# ==========================================
+# 8. BOXPLOT – PERFORMANCE DISTRIBUTION
+# ==========================================
+
+plt.figure(figsize=(6,4))
+sns.boxplot(data=df, x='Semester', y='Marks')
+plt.title("Marks Distribution Across Semesters")
+plt.show()
+
+# ==========================================
+# 9. FEATURE ENGINEERING FOR ML
+# ==========================================
+
+ml_df = df.groupby('StudentID').agg({
+    'Marks': ['mean', 'std'],
+    'Attendance': 'mean'
+})
+
+ml_df.columns = ['Avg_Marks', 'Marks_Std', 'Avg_Attendance']
+ml_df = ml_df.reset_index()
+
+# Label creation (Target variable)
+ml_df['Dropout_Risk'] = np.where(
+    (ml_df['Avg_Marks'] < 50) | (ml_df['Avg_Attendance'] < 60),
+    1,
+    0
+)
+
+print("\nML DATASET:")
+print(ml_df)
+
+# ==========================================
+# 10. MACHINE LEARNING MODEL
+# ==========================================
+
+X = ml_df[['Avg_Marks', 'Marks_Std', 'Avg_Attendance']]
+y = ml_df['Dropout_Risk']
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.3, random_state=42
+)
+
+model = LogisticRegression()
+model.fit(X_train, y_train)
+
+y_pred = model.predict(X_test)
+
+print("\nML MODEL PERFORMANCE")
+print("Accuracy:", accuracy_score(y_test, y_pred))
+print(classification_report(y_test, y_pred))
+
+# ==========================================
+# 11. FINAL CONSOLIDATED REPORT
+# ==========================================
+
+final_report = ml_df.merge(
+    risk_df[['StudentID', 'Rule_Based_Risk']],
+    on='StudentID'
+)
+
+final_report['ML_Risk_Level'] = np.where(
+    final_report['Dropout_Risk'] == 1,
+    'HIGH RISK',
+    'LOW RISK'
+)
+
+print("\nFINAL STUDENT RISK REPORT:")
+print(final_report)
+
+# ==========================================
+# END OF MAJOR PROJECT CODE
+# ==========================================
